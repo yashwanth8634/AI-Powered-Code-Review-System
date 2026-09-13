@@ -42,7 +42,7 @@ Understanding an entire codebase is a real, hard problem — large repos won't f
 
 ## 4. Team Split (3 people)
 
-### Person 1 (Yashwanth d)
+### Person 1 (Yashwanth)
 
 This is the actual hard problem. Everything else depends on this working.
 
@@ -71,7 +71,7 @@ This is the actual hard problem. Everything else depends on this working.
 
 ---
 
-### Person 2 (Normal Work — Dashboard & Scan Trigger UI)
+### Person 2 (Akhil — Dashboard & Scan Trigger UI)
 
 1. **"Analyze a Repo" Page**
    - Input field for a GitHub repo URL, an "Analyze" button
@@ -93,7 +93,7 @@ This is the actual hard problem. Everything else depends on this working.
 
 ---
 
-### Person 3 (Normal Work — Auth, Repo Connection & Settings)
+### Person 3 (Srija - Auth, Repo Connection & Settings)
 
 1. **GitHub OAuth Login**
    - NextAuth.js with GitHub provider — handles login/logout
@@ -111,17 +111,6 @@ This is the actual hard problem. Everything else depends on this working.
    - Explain what the tool does, how it's different from a normal PR-comment bot (whole-codebase understanding, not just diffs)
    - Write the README: setup steps, how repo connection + webhook registration works, screenshots
    - Keep notes as you go — this becomes your report content, don't leave it to the last day
-
----
-
-## 5. Git Workflow
-
-1. You (Person 1) create the main repo, push an initial Next.js scaffold
-2. Person 2 and Person 3 **fork** it to their own accounts
-3. Each works on a feature branch in their fork (e.g. `feature/scan-dashboard`, `feature/oauth-repo-connect`)
-4. They push to their fork, open a **Pull Request** back to your main repo
-5. You review and **merge**
-6. Everyone pulls latest `main` daily before starting new work — agree on the scan-result data shape on Day 1 so nobody builds against wrong assumptions
 
 ---
 
