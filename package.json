@@ -18,6 +18,8 @@
     "openai": "^7.15.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
+    "url-regex": "^5.0.0"
     "simple-git": "^3.36.0",
     "tmp-promise": "^3.0.3",
     "url-regex": "^5.0.0",
