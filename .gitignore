@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+#postman
+.postman
+/postman
+
+docs/memory.md
+docs/progress.md
+/tests
