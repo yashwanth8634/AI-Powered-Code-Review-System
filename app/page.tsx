@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Navbar from "./components/Navbar";
 
 export default function Home() {
   const [gitUrl, setGitUrl] = useState("");
@@ -53,6 +54,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#09090b] text-white">
+      <Navbar />
       {/* Background glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute left-1/2 top-[-300px] h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-violet-600/10 blur-[120px]" />
@@ -69,7 +71,7 @@ export default function Home() {
 
             <div>
               <h1 className="text-sm font-semibold tracking-wide">
-                AI CODE REVIEW
+                AI BASED REPO REVIEW
               </h1>
               <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
                 Intelligent Analysis

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Navbar from "../components/Navbar";
 
 type Severity = "High" | "Medium" | "Low";
 
@@ -86,6 +87,7 @@ function FindingCard({ finding }: { finding: Finding }) {
 
   return (
     <div className="group rounded-xl border border-white/10 bg-white/[0.025] p-5 transition duration-300 hover:border-white/20 hover:bg-white/[0.04]">
+        
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
           <div
@@ -169,6 +171,7 @@ export default function ScanReport() {
 
   return (
     <main className="min-h-screen bg-[#09090b] text-white">
+        <Navbar />
       {/* Background glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute left-1/2 top-[-300px] h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-violet-600/10 blur-[120px]" />
@@ -186,7 +189,7 @@ export default function ScanReport() {
 
             <div>
               <h1 className="text-sm font-semibold tracking-wide">
-                AI CODE REVIEW
+                AI BASED REPO REVIEW
               </h1>
 
               <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
