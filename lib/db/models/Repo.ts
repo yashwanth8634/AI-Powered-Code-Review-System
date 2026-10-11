@@ -23,6 +23,8 @@ const ScanSettingsSchema = new Schema<ScanSettings>(
 );
 
 export interface RepoDocument extends Document {
+  /** Auth.js subject identifying the account that connected this repository. */
+  userId: mongoose.Types.ObjectId;
   /** "owner/repo" — unique identifier for a GitHub repository. */
   ownerAndRepo: string;
   cloneUrl: string;
@@ -34,7 +36,13 @@ export interface RepoDocument extends Document {
 
 const RepoSchema = new Schema<RepoDocument>(
   {
-    ownerAndRepo: { type: String, required: true, unique: true },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    ownerAndRepo: { type: String, required: true },
     cloneUrl: { type: String, required: true },
     connectedAt: { type: Date, required: true, default: () => new Date() },
     webhookId: { type: Number },
@@ -42,6 +50,8 @@ const RepoSchema = new Schema<RepoDocument>(
   },
   { timestamps: false }
 );
+
+RepoSchema.index({ userId: 1, ownerAndRepo: 1 }, { unique: true });
 
 export const Repo =
   (models.Repo as mongoose.Model<RepoDocument>) ??

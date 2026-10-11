@@ -15,17 +15,15 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { runFullScan } from '@/lib/pipeline';
 import { QUEUE_NAME, type ScanJobPayload } from './scanQueue';
+import { env } from '@/lib/config/env';
 
-const REDIS_URL = process.env.REDIS_URL;
-if (!REDIS_URL) {
-  throw new Error('REDIS_URL is not set.');
-}
+const REDIS_URL = env.redisUrl();
 
 /**
  * How many jobs to process in parallel.
  * Keep low (2) — each job makes 2 LLM API calls which are rate-limited.
  */
-const WORKER_CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? '2');
+const WORKER_CONCURRENCY = env.workerConcurrency();
 
 const connection = new IORedis(REDIS_URL, {
   maxRetriesPerRequest: null,
@@ -35,13 +33,13 @@ const connection = new IORedis(REDIS_URL, {
 const worker = new Worker<ScanJobPayload>(
   QUEUE_NAME,
   async (job) => {
-    const { repoUrl, triggeredBy, settings, scanId } = job.data;
+    const { userId, repoUrl, triggeredBy, settings, scanId } = job.data;
 
     console.log(
       `[worker] Starting job ${job.id}: ${repoUrl} (triggered by: ${triggeredBy})`
     );
 
-    const result = await runFullScan({ repoUrl, triggeredBy, settings, scanId });
+    const result = await runFullScan({ userId, repoUrl, triggeredBy, settings, scanId });
 
     console.log(
       `[worker] Finished job ${job.id}: status=${result.status} scanId=${result.id}`

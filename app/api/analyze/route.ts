@@ -9,7 +9,10 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { connectDb, Scan } from '@/lib/db';
 import { addScanJob } from '@/lib/queue';
-import { parseGitHubUrl } from '@/app/utils/validateGitUrl';
+import { parseGitHubUrl } from '@/lib/validation/github-url';
+import { readJson } from '@/lib/http/response';
+import { getAuthenticatedUserId } from '@/lib/auth/getUserId';
+import { Repo } from '@/lib/db/models/Repo';
 
 const AnalyzeBodySchema = z.object({
   gitUrl: z.string().min(1, 'gitUrl is required'),
@@ -24,18 +27,21 @@ const AnalyzeBodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const rawBody = await request.json().catch(() => null);
-    if (!rawBody) {
-      return NextResponse.json(
-        { error: 'Invalid JSON request body.' },
-        { status: 400 }
-      );
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
+
+    const rawBody = await readJson(request);
+    const body =
+      typeof rawBody === "object" && rawBody !== null
+        ? rawBody as Record<string, unknown>
+        : {};
 
     // Accept both gitUrl or repoUrl aliases
     const normalizedBody = {
-      gitUrl: rawBody.gitUrl ?? rawBody.repoUrl,
-      settings: rawBody.settings,
+      gitUrl: body.gitUrl ?? body.repoUrl,
+      settings: body.settings,
     };
 
     const parsed = AnalyzeBodySchema.safeParse(normalizedBody);
@@ -65,8 +71,21 @@ export async function POST(request: Request) {
 
     await connectDb();
 
+    const connectedRepo = await Repo.findOne({
+      userId,
+      ownerAndRepo: parsedRepo.fullName,
+    }).lean();
+
+    if (!connectedRepo) {
+      return NextResponse.json(
+        { error: 'Connect this repository before starting a scan.' },
+        { status: 403 },
+      );
+    }
+
     // Create a pending Scan record in MongoDB immediately so clients can poll.
     const scanDoc = await Scan.create({
+      userId,
       repoUrl: parsedRepo.normalizedUrl,
       ownerAndRepo: parsedRepo.fullName,
       triggeredBy: 'on-demand',
@@ -91,9 +110,10 @@ export async function POST(request: Request) {
     // Enqueue background scan job
     try {
       await addScanJob({
+        userId,
         repoUrl: parsedRepo.normalizedUrl,
         triggeredBy: 'on-demand',
-        settings,
+        settings: settings ?? connectedRepo.settings,
         scanId,
       });
     } catch (queueErr) {

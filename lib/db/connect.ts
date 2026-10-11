@@ -7,6 +7,7 @@
  */
 
 import mongoose from 'mongoose';
+import { env } from '@/lib/config/env';
 
 // Extend the Node.js global to hold our cached promise.
 declare global {
@@ -18,10 +19,7 @@ declare global {
  * Call this at the top of every API route and worker that touches the DB.
  */
 export async function connectDb(): Promise<void> {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    throw new Error('MONGODB_URI is not set. Add it to .env.local.');
-  }
+  const uri = env.mongodbUri();
 
   if (mongoose.connection.readyState === 1) {
     // Already connected — nothing to do.

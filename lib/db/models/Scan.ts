@@ -70,10 +70,18 @@ const SummarySchema = new Schema<ScanSummary>(
 // Root schema
 // ---------------------------------------------------------------------------
 
-export interface ScanDocument extends Omit<ScanResult, 'id'>, Document {}
+export interface ScanDocument extends Omit<ScanResult, 'id'>, Document {
+  userId: mongoose.Types.ObjectId;
+}
 
 const ScanSchema = new Schema<ScanDocument>(
   {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
     repoUrl: { type: String, required: true },
     ownerAndRepo: { type: String, required: true, index: true },
     triggeredBy: {
@@ -101,6 +109,8 @@ const ScanSchema = new Schema<ScanDocument>(
     toObject: { virtuals: false },
   }
 );
+
+ScanSchema.index({ userId: 1, ownerAndRepo: 1, startedAt: -1 });
 
 // Prevent model re-registration during Next.js hot-reload.
 export const Scan =

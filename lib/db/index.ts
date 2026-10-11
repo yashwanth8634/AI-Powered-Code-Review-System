@@ -7,3 +7,4 @@
 export { connectDb } from './connect';
 export { Scan } from './models/Scan';
 export { Repo } from './models/Repo';
+export { User } from './models/User';

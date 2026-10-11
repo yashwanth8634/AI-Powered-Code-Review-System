@@ -77,10 +77,18 @@ export async function POST(request: Request) {
       ownerAndRepo: repository.full_name,
     }).lean();
 
+    if (!repoDoc) {
+      return NextResponse.json(
+        { message: 'Repository is not connected to an account.' },
+        { status: 202 }
+      );
+    }
+
     const settings = repoDoc?.settings;
 
     // 6. Create pending Scan record in MongoDB
     const scanDoc = await Scan.create({
+      userId: String(repoDoc.userId),
       repoUrl: repository.clone_url,
       ownerAndRepo: repository.full_name,
       triggeredBy: 'webhook',
@@ -105,6 +113,7 @@ export async function POST(request: Request) {
     // 7. Enqueue background scan job
     try {
       await addScanJob({
+        userId: String(repoDoc.userId),
         repoUrl: repository.clone_url,
         triggeredBy: 'webhook',
         settings,

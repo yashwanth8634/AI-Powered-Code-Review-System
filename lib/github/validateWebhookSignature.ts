@@ -6,6 +6,7 @@
  */
 
 import crypto from 'crypto';
+import { env } from '@/lib/config/env';
 
 /**
  * Validates that an incoming webhook payload was sent by GitHub and matches
@@ -23,13 +24,7 @@ export function validateWebhookSignature(
     return false;
   }
 
-  const secret = process.env.GITHUB_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error(
-      '[validateWebhookSignature] GITHUB_WEBHOOK_SECRET is not configured.'
-    );
-    return false;
-  }
+  const secret = env.githubWebhookSecret();
 
   const hmac = crypto.createHmac('sha256', secret);
   hmac.update(payload, 'utf8');

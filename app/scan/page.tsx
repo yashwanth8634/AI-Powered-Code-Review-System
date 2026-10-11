@@ -198,56 +198,6 @@ function getHealthStatus(score: number) {
   };
 }
 
-function getReviewSummary(scan: ScanResult) {
-  const total = scan.summary.totalIssues;
-  const critical = scan.summary.securityCritical;
-  const high = scan.summary.architectureHigh + scan.summary.securityHigh;
-  const medium = scan.summary.architectureMedium + scan.summary.securityMedium;
-
-  if (total === 0) {
-    return {
-      title: "No findings detected",
-      text: "The completed analysis did not report architecture or security findings for this scan.",
-      tone: "border-emerald-400/15 bg-emerald-400/[0.035]",
-      icon: "✓",
-    };
-  }
-
-  if (critical > 0) {
-    return {
-      title: "Critical security findings require review",
-      text: `${critical} critical security finding${critical === 1 ? "" : "s"} ${critical === 1 ? "was" : "were"} reported in this scan.`,
-      tone: "border-red-400/15 bg-red-400/[0.035]",
-      icon: "!",
-    };
-  }
-
-  if (high > 0) {
-    return {
-      title: "High-priority findings detected",
-      text: `${high} high-severity finding${high === 1 ? "" : "s"} ${high === 1 ? "was" : "were"} reported and should be reviewed.`,
-      tone: "border-red-400/15 bg-red-400/[0.035]",
-      icon: "!",
-    };
-  }
-
-  if (medium > 0) {
-    return {
-      title: "Review recommended",
-      text: `${medium} medium-severity finding${medium === 1 ? "" : "s"} ${medium === 1 ? "was" : "were"} reported in the completed analysis.`,
-      tone: "border-amber-400/15 bg-amber-400/[0.035]",
-      icon: "!",
-    };
-  }
-
-  return {
-    title: "Minor improvements identified",
-    text: `${total} low-severity finding${total === 1 ? "" : "s"} ${total === 1 ? "was" : "were"} reported.`,
-    tone: "border-blue-400/15 bg-blue-400/[0.035]",
-    icon: "i",
-  };
-}
-
 function ScanReportContent() {
   const searchParams = useSearchParams();
   const scanId = searchParams.get("scanId");
@@ -260,8 +210,6 @@ function ScanReportContent() {
 
   useEffect(() => {
     if (!scanId) {
-      setError("No scan ID was provided.");
-      setLoading(false);
       return;
     }
 
@@ -358,8 +306,13 @@ function ScanReportContent() {
     );
   }
 
-  // Initial loading state
-  if (loading && !scan) {
+  // A pending or running scan has only placeholder findings and must not
+  // render a health score until the worker has completed it.
+  if (
+    (loading && !scan) ||
+    scan?.status === "pending" ||
+    scan?.status === "running"
+  ) {
     return (
       <main className="min-h-screen bg-[#09090b] text-white">
         <Navbar />
@@ -374,12 +327,15 @@ function ScanReportContent() {
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/10 border-t-violet-400" />
 
           <h2 className="mt-6 text-2xl font-bold">
-            Scan in progress
+            {scan?.status === "pending"
+              ? "Scan queued"
+              : "Scan in progress"}
           </h2>
 
           <p className="mt-2 max-w-md text-sm leading-6 text-zinc-500">
-            Your repository is being analyzed for architectural
-            problems and security issues.
+            {scan?.status === "pending"
+              ? "Your repository is waiting for the analysis worker to begin."
+              : "Your repository is being analyzed for architectural problems and security issues."}
           </p>
 
           <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.025] px-4 py-3">
@@ -510,8 +466,6 @@ function ScanReportContent() {
 
   const healthStatus =
     getHealthStatus(healthScore);
-
-  const reviewSummary = getReviewSummary(scan);
 
   const startedTime =
     new Date(

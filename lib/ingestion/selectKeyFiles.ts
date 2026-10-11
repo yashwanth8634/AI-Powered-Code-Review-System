@@ -23,16 +23,13 @@ import type { FileEntry, KeyFile } from '@/lib/types';
 // ---------------------------------------------------------------------------
 
 /**
- * Individual file truncation limit (≈ 5,000 tokens at 4 chars/token).
+ * Individual file truncation limit (≈ 3,000 tokens at 4 chars/token).
  * Large files are truncated; a marker comment is appended.
  */
-const FILE_TRUNCATE_BYTES = 20_000;
+const FILE_TRUNCATE_BYTES = 12_000;
 
-/**
- * Total byte budget across all key files (≈ 80,000 tokens).
- * Stays well within GPT-4o's 128k token window after the prompt wrapping.
- */
-const TOTAL_BUDGET_BYTES = 320_000;
+/** Total byte budget across all key files (≈ 30,000 tokens). */
+const TOTAL_BUDGET_BYTES = 120_000;
 
 /** Max number of files from the "large source files" tier. */
 const MAX_LARGE_FILES = 10;

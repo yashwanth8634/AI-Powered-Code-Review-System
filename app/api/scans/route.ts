@@ -10,9 +10,15 @@
 import { NextResponse } from 'next/server';
 import { connectDb, Scan } from '@/lib/db';
 import type { ScanResult } from '@/lib/types';
+import { getAuthenticatedUserId } from '@/lib/auth/getUserId';
 
 export async function GET(request: Request) {
   try {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const repoParam = searchParams.get('repo');
     const limitParam = parseInt(searchParams.get('limit') ?? '20', 10);
@@ -20,7 +26,9 @@ export async function GET(request: Request) {
 
     await connectDb();
 
-    const query = repoParam ? { ownerAndRepo: repoParam } : {};
+    const query = repoParam
+      ? { userId, ownerAndRepo: repoParam }
+      : { userId };
 
     const docs = await Scan.find(query)
       .sort({ startedAt: -1 })

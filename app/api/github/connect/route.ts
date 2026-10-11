@@ -3,6 +3,8 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db/connect";
 import { Repo } from "@/lib/db/models/Repo";
+import { env } from "@/lib/config/env";
+import { getAuthenticatedUserId } from "@/lib/auth/getUserId";
 
 interface ConnectRepoRequest {
   owner: string;
@@ -19,9 +21,17 @@ export async function POST(req: Request) {
     );
   }
 
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Authenticated account has no stable user id" },
+      { status: 401 }
+    );
+  }
+
   const token = await getToken({
     req,
-    secret: process.env.AUTH_SECRET,
+    secret: env.authSecret(),
   });
 
   const githubAccessToken = token?.githubAccessToken as string | undefined;
@@ -33,8 +43,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const webhookUrl = process.env.GITHUB_WEBHOOK_URL;
-  const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+  const webhookUrl = env.githubWebhookUrl();
+  const webhookSecret = env.githubWebhookSecret();
 
   if (!webhookUrl) {
     return NextResponse.json(
@@ -136,8 +146,9 @@ export async function POST(req: Request) {
     await connectDb();
 
     const connectedRepo = await Repo.findOneAndUpdate(
-      { ownerAndRepo: `${owner}/${repo}` },
+      { userId, ownerAndRepo: `${owner}/${repo}` },
       {
+        userId,
         ownerAndRepo: `${owner}/${repo}`,
         cloneUrl: githubRepo.clone_url,
         connectedAt: new Date(),
@@ -177,12 +188,18 @@ export async function GET() {
   try {
     await connectDb();
 
-    const repository = await Repo.findOne()
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const repositories = await Repo.find({ userId })
       .sort({ connectedAt: -1 })
       .lean();
 
     return NextResponse.json({
-      repository,
+      repositories,
+      repository: repositories[0] ?? null,
     });
   } catch (error) {
     console.error("Get connected repository error:", error);
@@ -219,8 +236,13 @@ export async function PUT(req: Request) {
 
     await connectDb();
 
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const updatedRepo = await Repo.findOneAndUpdate(
-      { ownerAndRepo },
+      { userId, ownerAndRepo },
       {
         $set: {
           settings: {

@@ -14,11 +14,13 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import type { ScanSettings } from '@/lib/types';
+import { env } from '@/lib/config/env';
 
 export const QUEUE_NAME = 'scan-jobs';
 
 /** Payload stored in each BullMQ job. */
 export interface ScanJobPayload {
+  userId: string;
   repoUrl: string;
   triggeredBy: 'on-demand' | 'webhook';
   settings?: ScanSettings;
@@ -34,10 +36,7 @@ export function getScanQueue(): Queue<ScanJobPayload> {
     return scanQueue;
   }
 
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
-    throw new Error('REDIS_URL is not set. Add it to .env.local.');
-  }
+  const redisUrl = env.redisUrl();
 
   connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,

@@ -185,7 +185,13 @@ export default function HistoryPage() {
 
       setError("");
 
-      const response = await fetch("/api/scans?limit=100", {
+      const repo = new URLSearchParams(window.location.search).get("repo");
+      const query = new URLSearchParams({ limit: "100" });
+      if (repo) {
+        query.set("repo", repo);
+      }
+
+      const response = await fetch(`/api/scans?${query.toString()}`, {
         cache: "no-store",
       });
 
@@ -215,7 +221,11 @@ export default function HistoryPage() {
   };
 
   useEffect(() => {
-    fetchHistory();
+    const timer = window.setTimeout(() => {
+      void fetchHistory();
+    });
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const completedScans = useMemo(() => {

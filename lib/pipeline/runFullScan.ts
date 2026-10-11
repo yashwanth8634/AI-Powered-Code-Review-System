@@ -91,6 +91,7 @@ function toScanResult(doc: { _id: unknown } & Partial<ScanResult>): ScanResult {
 // ---------------------------------------------------------------------------
 
 export interface RunFullScanOptions {
+  userId: string;
   repoUrl: string;
   triggeredBy: 'on-demand' | 'webhook';
   settings?: ScanSettings;
@@ -109,7 +110,7 @@ export interface RunFullScanOptions {
  * @returns The final ScanResult (complete or failed).
  */
 export async function runFullScan(options: RunFullScanOptions): Promise<ScanResult> {
-  const { repoUrl, triggeredBy, settings } = options;
+  const { userId, repoUrl, triggeredBy, settings } = options;
   const startedAt = new Date().toISOString();
 
   await connectDb();
@@ -118,6 +119,7 @@ export async function runFullScan(options: RunFullScanOptions): Promise<ScanResu
   let scanId = options.scanId;
   if (!scanId) {
     const scanDoc = await Scan.create({
+      userId,
       repoUrl,
       ownerAndRepo: repoUrl, // Will be overwritten with the parsed value after ingestion.
       triggeredBy,

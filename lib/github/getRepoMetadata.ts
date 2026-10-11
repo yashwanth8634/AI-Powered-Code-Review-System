@@ -5,6 +5,7 @@
  */
 
 import { Octokit } from '@octokit/rest';
+import { env } from '@/lib/config/env';
 
 export interface RepoMetadata {
   owner: string;
@@ -31,7 +32,7 @@ export async function getRepoMetadata(
   owner: string,
   repo: string
 ): Promise<RepoMetadata> {
-  const auth = process.env.GITHUB_TOKEN;
+  const auth = env.githubToken();
   const octokit = new Octokit(auth ? { auth } : undefined);
 
   const { data } = await octokit.rest.repos.get({

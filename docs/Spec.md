@@ -36,6 +36,7 @@ Understanding an entire codebase is a real, hard problem — large repos won't f
 - **AI:** OpenAI API (GPT-4o) or Claude API — large context call with file tree + key file contents
 - **Security Scanning:** Semgrep CLI (run as a subprocess on the cloned repo)
 - **Auth:** GitHub OAuth via NextAuth.js
+- **Account ownership:** Every connected repository and scan history record is scoped to the authenticated GitHub account. Users can attach multiple repositories and view the history for each attached repository.
 - **Deployment:** Vercel for frontend/API routes; note that long-running clone+scan jobs may need a separate small server or serverless function with a longer timeout (Vercel functions have execution limits — mention this as a known constraint)
 
 ---

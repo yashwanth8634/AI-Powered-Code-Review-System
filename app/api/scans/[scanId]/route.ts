@@ -9,12 +9,18 @@ import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectDb, Scan } from '@/lib/db';
 import type { ScanResult } from '@/lib/types';
+import { getAuthenticatedUserId } from '@/lib/auth/getUserId';
 
 export async function GET(
   _request: Request,
   props: { params: Promise<{ scanId: string }> }
 ) {
   try {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const { scanId } = await props.params;
 
     if (!scanId || !mongoose.Types.ObjectId.isValid(scanId)) {
@@ -26,7 +32,7 @@ export async function GET(
 
     await connectDb();
 
-    const doc = await Scan.findById(scanId).lean();
+    const doc = await Scan.findOne({ _id: scanId, userId }).lean();
 
     if (!doc) {
       return NextResponse.json(

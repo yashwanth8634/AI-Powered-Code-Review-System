@@ -9,9 +9,13 @@
 
 import OpenAI from 'openai';
 import { LLMError } from '@/lib/errors';
+import { env } from '@/lib/config/env';
 
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes
+/** Keep room for the model's response across providers with smaller contexts. */
+const MAX_USER_PROMPT_CHARS = 180_000;
+const MAX_COMPLETION_TOKENS = 4_096;
 
 export interface LLMCallOptions {
   maxRetries?: number;
@@ -19,25 +23,19 @@ export interface LLMCallOptions {
 }
 
 function getClientAndModel() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new LLMError(
-      'LLM_API_ERROR',
-      'OPENAI_API_KEY is not set. Add it to .env.'
-    );
-  }
+  const apiKey = env.openAiApiKey();
 
   // Auto-detect Groq keys (gsk_...) or use custom base URL
   const isGroq =
     apiKey.startsWith('gsk_') ||
-    process.env.OPENAI_BASE_URL?.includes('groq.com');
+    env.openAiBaseUrl()?.includes('groq.com');
 
   const baseURL =
-    process.env.OPENAI_BASE_URL ??
+    env.openAiBaseUrl() ??
     (isGroq ? 'https://api.groq.com/openai/v1' : undefined);
 
   const model =
-    process.env.OPENAI_MODEL ??
+    env.openAiModel() ??
     (isGroq ? 'openai/gpt-oss-120b' : 'gpt-4o');
 
   const client = new OpenAI({
@@ -46,6 +44,36 @@ function getClientAndModel() {
   });
 
   return { client, model };
+}
+
+function limitPrompt(prompt: string): string {
+  if (prompt.length <= MAX_USER_PROMPT_CHARS) return prompt;
+
+  return `${prompt.slice(
+    0,
+    MAX_USER_PROMPT_CHARS
+  )}\n\n[Input truncated to fit the model context window.]`;
+}
+
+function isContextLengthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const candidate = error as {
+    status?: number;
+    message?: string;
+    error?: { code?: string; message?: string };
+  };
+  const message = `${candidate.message ?? ''} ${
+    candidate.error?.message ?? ''
+  }`.toLowerCase();
+  const code = candidate.error?.code?.toLowerCase();
+
+  return (
+    candidate.status === 400 &&
+    (code === 'context_length_exceeded' ||
+      message.includes('reduce the length of the messages') ||
+      message.includes('context length'))
+  );
 }
 
 /**
@@ -80,9 +108,10 @@ export async function callLLM(
           {
             model,
             response_format: { type: 'json_object' },
+            max_completion_tokens: MAX_COMPLETION_TOKENS,
             messages: [
               { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt },
+              { role: 'user', content: limitPrompt(userPrompt) },
             ],
             temperature: 0.2, // Low temperature for deterministic structured output.
           },
@@ -111,6 +140,15 @@ export async function callLLM(
         throw new LLMError(
           'LLM_TIMEOUT',
           `LLM call timed out after ${timeoutMs}ms (attempt ${attempt + 1})`
+        );
+      }
+
+      // A context-length error is deterministic; retrying the same payload
+      // only delays the actionable failure and can multiply provider charges.
+      if (isContextLengthError(err)) {
+        throw new LLMError(
+          'LLM_API_ERROR',
+          'LLM request exceeded the model context limit. Reduce the repository context and try again.'
         );
       }
 
