@@ -6,15 +6,15 @@ declare module "next-auth" {
     id: string;
   }
 
-  declare module "next-auth/jwt" {
-    interface JWT {
-      githubId?: string;
-      githubAccessToken?: string;
-      userId?: string;
-    }
-  }
-
   interface Session {
     user: User;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    githubId?: string;
+    githubAccessToken?: string;
+    userId?: string;
   }
 }

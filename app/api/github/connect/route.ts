@@ -1,10 +1,10 @@
 import { auth } from "@/auth";
-import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import { connectDb } from "@/lib/db/connect";
 import { Repo } from "@/lib/db/models/Repo";
 import { env } from "@/lib/config/env";
 import { getAuthenticatedUserId } from "@/lib/auth/getUserId";
+import { getGitHubAccessToken } from "@/lib/auth/getGitHubAccessToken";
 
 interface ConnectRepoRequest {
   owner: string;
@@ -29,12 +29,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const token = await getToken({
-    req,
-    secret: env.authSecret(),
-  });
-
-  const githubAccessToken = token?.githubAccessToken as string | undefined;
+  const githubAccessToken = await getGitHubAccessToken(req);
 
   if (!githubAccessToken) {
     return NextResponse.json(

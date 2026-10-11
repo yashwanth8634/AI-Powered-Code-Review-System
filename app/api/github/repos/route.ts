@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
-import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
-import { env } from "@/lib/config/env";
+import { getGitHubAccessToken } from "@/lib/auth/getGitHubAccessToken";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -13,12 +12,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const token = await getToken({
-    req,
-    secret: env.authSecret(),
-  });
-
-  const githubAccessToken = token?.githubAccessToken as string | undefined;
+  const githubAccessToken = await getGitHubAccessToken(req);
 
   if (!githubAccessToken) {
     return NextResponse.json(
