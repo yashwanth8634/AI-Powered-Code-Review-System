@@ -61,17 +61,20 @@ export interface ArchitectureFinding {
 // Security findings
 // ---------------------------------------------------------------------------
 
-/** One Semgrep finding before the LLM explanation pass. */
-export interface SemgrepRawFinding {
+/** One static analysis finding before the LLM explanation pass. */
+export interface RawSecurityFinding {
   ruleId: string;
   filePath: string;
   startLine: number;
   endLine: number;
-  /** Semgrep's own message string. */
+  /** Scanner message string. */
   message: string;
-  /** Semgrep's own severity label (INFO / WARNING / ERROR). */
+  /** Scanner severity label (e.g. WARNING, ERROR). */
   severity: string;
 }
+
+/** Backward-compatibility alias. */
+export type SemgrepRawFinding = RawSecurityFinding;
 
 /** One security finding after the LLM plain-language explanation pass. */
 export interface SecurityFinding {

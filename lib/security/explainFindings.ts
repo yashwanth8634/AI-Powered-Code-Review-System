@@ -9,14 +9,14 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { callLLM } from '@/lib/analysis/callLLM';
 import { LLMError } from '@/lib/errors';
-import type { SemgrepRawFinding, SecurityFinding, ScanSettings } from '@/lib/types';
+import type { RawSecurityFinding, SecurityFinding, ScanSettings } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // Prompt
 // ---------------------------------------------------------------------------
 
 const SYSTEM_PROMPT = `You are a senior application security engineer.
-You will receive a list of static analysis findings from Semgrep.
+You will receive a list of static analysis security findings.
 Your task is to translate each finding into plain language and assess its real-world risk.
 
 Return a JSON object with a single key "findings" whose value is an array.
@@ -35,10 +35,10 @@ Each element must match this exact schema:
 Rules:
 - Every input finding must appear in the output array.
 - Return ONLY the JSON object — no markdown fences, no prose.
-- severity must reflect real-world exploitability, not just Semgrep's label.
+- severity must reflect real-world exploitability, not just the static scanner's label.
 - riskRank must be unique integers starting at 1 (most dangerous).`;
 
-function buildSecurityUserPrompt(findings: SemgrepRawFinding[]): string {
+function buildSecurityUserPrompt(findings: RawSecurityFinding[]): string {
   const list = findings
     .map(
       (f, i) =>
@@ -46,7 +46,7 @@ function buildSecurityUserPrompt(findings: SemgrepRawFinding[]): string {
     )
     .join('\n\n');
 
-  return `Here are ${findings.length} Semgrep findings to explain:\n\n${list}`;
+  return `Here are ${findings.length} security findings to explain:\n\n${list}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ function parseExplainResponse(rawText: string): SecurityFinding[] {
  * @param settings - Optional per-repo scan settings.
  */
 export async function explainFindings(
-  findings: SemgrepRawFinding[],
+  findings: RawSecurityFinding[],
   settings?: ScanSettings
 ): Promise<SecurityFinding[]> {
   if (settings?.skipSecurity || findings.length === 0) {

@@ -4,13 +4,13 @@
  * Public API for the security module.
  */
 
-import { runSemgrep } from './runSemgrep';
+import { runEslintSecurity } from './runEslintSecurity';
 import { explainFindings } from './explainFindings';
 import type { SecurityFinding, ScanSettings } from '@/lib/types';
 
 /**
  * Runs the full security analysis pass:
- *   1. Runs Semgrep against the cloned repo.
+ *   1. Runs eslint-plugin-security AST analysis against the cloned repo.
  *   2. Passes raw findings to GPT-4o for plain-language explanation + risk rank.
  *
  * Returns [] immediately if settings.skipSecurity is true.
@@ -26,6 +26,9 @@ export async function runSecurityAnalysis(
     return [];
   }
 
-  const rawFindings = await runSemgrep(repoPath);
+  const rawFindings = await runEslintSecurity(repoPath);
   return explainFindings(rawFindings, settings);
 }
+
+export { runEslintSecurity } from './runEslintSecurity';
+export { explainFindings } from './explainFindings';
