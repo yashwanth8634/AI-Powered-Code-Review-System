@@ -46,4 +46,8 @@ export const env = {
     const value = Number(process.env.WORKER_CONCURRENCY ?? "1");
     return Number.isInteger(value) && value > 0 ? value : 1;
   },
+  workerPort: () => {
+    const value = Number(process.env.WORKER_PORT ?? process.env.PORT ?? "3001");
+    return Number.isInteger(value) && value > 0 ? value : 3001;
+  },
 };

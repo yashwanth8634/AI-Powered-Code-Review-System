@@ -15,9 +15,11 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { runFullScan } from '@/lib/pipeline';
 import { QUEUE_NAME, type ScanJobPayload } from './scanQueue';
+import { createWorkerHealthServer } from './workerHealthServer';
 import { env } from '@/lib/config/env';
 
 const REDIS_URL = env.redisUrl();
+const WORKER_PORT = env.workerPort();
 
 /**
  * How many jobs to process in parallel.
@@ -81,9 +83,16 @@ console.log(
   `[worker] Scan worker started. Concurrency: ${WORKER_CONCURRENCY}. Listening on queue: ${QUEUE_NAME}`
 );
 
+// Start lightweight health probe server for container orchestrators / monitoring.
+const healthServer = createWorkerHealthServer(worker, QUEUE_NAME);
+healthServer.listen(WORKER_PORT, () => {
+  console.log(`[worker] Health check server listening on port ${WORKER_PORT} (GET /health)`);
+});
+
 // Graceful shutdown on SIGTERM / SIGINT (e.g. Docker stop, Ctrl+C).
 const shutdown = async (signal: string) => {
   console.log(`[worker] Received ${signal}. Shutting down gracefully…`);
+  healthServer.close();
   await worker.close();
   process.exit(0);
 };
