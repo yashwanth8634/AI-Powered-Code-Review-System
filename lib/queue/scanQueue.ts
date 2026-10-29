@@ -25,6 +25,8 @@ export interface ScanJobPayload {
   triggeredBy: 'on-demand' | 'webhook';
   settings?: ScanSettings;
   scanId?: string;
+  /** Short-lived GitHub OAuth token used only while cloning the repository. */
+  githubAccessToken?: string;
 }
 
 // Singleton instances created lazily on first access.
@@ -40,7 +42,9 @@ export function getScanQueue(): Queue<ScanJobPayload> {
 
   connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
-    enableOfflineQueue: false,
+    // Queue commands issued immediately after startup must wait for the
+    // connection handshake instead of failing with "Stream isn't writeable".
+    enableOfflineQueue: true,
   });
 
   scanQueue = new Queue<ScanJobPayload>(QUEUE_NAME, { connection });
@@ -55,6 +59,26 @@ export function getScanQueue(): Queue<ScanJobPayload> {
  */
 export async function addScanJob(payload: ScanJobPayload): Promise<string> {
   const queue = getScanQueue();
+  if (connection && connection.status !== 'ready') {
+    await new Promise<void>((resolve, reject) => {
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const cleanup = () => {
+        connection?.off('ready', onReady);
+        connection?.off('error', onError);
+      };
+
+      connection?.once('ready', onReady);
+      connection?.once('error', onError);
+    });
+  }
+
   const job = await queue.add('scan', payload, {
     attempts: 3,
     backoff: {

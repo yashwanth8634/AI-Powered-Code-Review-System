@@ -31,6 +31,13 @@ export async function runArchitectureAnalysis(
   }
 
   const { systemPrompt, userPrompt } = buildArchitecturePrompt(context, settings);
+  console.info('[runArchitectureAnalysis] Prepared architecture prompt', {
+    event: 'architecture_prompt_prepared',
+    ownerAndRepo: context.ownerAndRepo,
+    keyFileCount: context.keyFileContents.length,
+    fileTreeChars: context.fileTree.length,
+    userPromptChars: userPrompt.length,
+  });
   const rawText = await callLLM(systemPrompt, userPrompt);
   return parseArchitectureResponse(rawText, settings);
 }

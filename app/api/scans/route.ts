@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       startedAt: doc.startedAt,
       completedAt: doc.completedAt ?? '',
       status: doc.status,
+      errorCode: doc.errorCode,
       errorMessage: doc.errorMessage,
       architectureFindings: doc.architectureFindings ?? [],
       securityFindings: doc.securityFindings ?? [],

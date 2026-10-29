@@ -72,6 +72,7 @@ const SummarySchema = new Schema<ScanSummary>(
 
 export interface ScanDocument extends Omit<ScanResult, 'id'>, Document {
   userId: mongoose.Types.ObjectId;
+  repoId?: mongoose.Types.ObjectId;
 }
 
 const ScanSchema = new Schema<ScanDocument>(
@@ -80,6 +81,11 @@ const ScanSchema = new Schema<ScanDocument>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
+    },
+    repoId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Repo',
       index: true,
     },
     repoUrl: { type: String, required: true },
@@ -97,6 +103,7 @@ const ScanSchema = new Schema<ScanDocument>(
       required: true,
       default: 'pending',
     },
+    errorCode: { type: String },
     errorMessage: { type: String },
     architectureFindings: { type: [ArchitectureFindingSchema], default: [] },
     securityFindings: { type: [SecurityFindingSchema], default: [] },

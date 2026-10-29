@@ -46,4 +46,7 @@ next-env.d.ts
 
 docs/memory.md
 docs/progress.md
-/tests
+# Source tests are committed and exercised by `npm test`.
+
+PROJECT_FLOW.md
+tests

@@ -9,12 +9,11 @@ import { cloneRepo, type CloneResult } from './cloneRepo';
 import { buildFileTree } from './buildFileTree';
 import { selectKeyFiles } from './selectKeyFiles';
 import type { RepoContext } from '@/lib/types';
+import { parseGitHubUrl } from '@/lib/validation/github-url';
 
 /** Extracts "owner/repo" from a GitHub URL. */
 function parseOwnerAndRepo(repoUrl: string): string {
-  // Works for https://github.com/owner/repo and https://github.com/owner/repo.git
-  const match = repoUrl.match(/github\.com\/([^/]+\/[^/.]+)/);
-  return match ? match[1] : repoUrl;
+  return parseGitHubUrl(repoUrl)?.fullName ?? repoUrl;
 }
 
 export interface IngestResult {
@@ -32,8 +31,11 @@ export interface IngestResult {
  * @param repoUrl - Full HTTPS GitHub URL.
  * @returns context + cleanup. The caller MUST call cleanup() in a finally block.
  */
-export async function ingestRepo(repoUrl: string): Promise<IngestResult> {
-  const { clonePath, cleanup } = await cloneRepo(repoUrl);
+export async function ingestRepo(
+  repoUrl: string,
+  githubAccessToken?: string,
+): Promise<IngestResult> {
+  const { clonePath, cleanup } = await cloneRepo(repoUrl, githubAccessToken);
 
   const { tree, entries } = buildFileTree(clonePath);
   const keyFileContents = selectKeyFiles(entries, clonePath);

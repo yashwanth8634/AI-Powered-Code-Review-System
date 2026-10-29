@@ -213,8 +213,8 @@ function ScanReportContent() {
       return;
     }
 
-    let intervalId: ReturnType<typeof setInterval> | null =
-      null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
     const fetchScan = async () => {
       try {
@@ -226,6 +226,10 @@ function ScanReportContent() {
         );
 
         const data = await response.json();
+
+        if (cancelled) {
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(
@@ -240,13 +244,17 @@ function ScanReportContent() {
           data.status === "failed"
         ) {
           setLoading(false);
-
-          if (intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
-          }
+          return;
         }
+
+        timeoutId = setTimeout(() => {
+          void fetchScan();
+        }, 2000);
       } catch (err) {
+        if (cancelled) {
+          return;
+        }
+
         setError(
           err instanceof Error
             ? err.message
@@ -254,24 +262,15 @@ function ScanReportContent() {
         );
 
         setLoading(false);
-
-        if (intervalId) {
-          clearInterval(intervalId);
-          intervalId = null;
-        }
       }
     };
 
-    fetchScan();
-
-    intervalId = setInterval(
-      fetchScan,
-      2000
-    );
+    void fetchScan();
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     };
   }, [scanId]);
@@ -414,6 +413,10 @@ function ScanReportContent() {
               "The scan could not be completed."}
           </p>
 
+          <p className="mt-3 font-mono text-xs text-zinc-600">
+            Reference: {scan.errorCode || "SCAN_FAILED"}
+          </p>
+
           <div className="mt-6 flex gap-3">
             <Link
               href="/"
@@ -421,15 +424,6 @@ function ScanReportContent() {
             >
               New Scan
             </Link>
-
-            <button
-              onClick={() =>
-                window.location.reload()
-              }
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
-            >
-              Retry
-            </button>
           </div>
         </section>
       </main>

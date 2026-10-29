@@ -12,6 +12,18 @@ function required(name: string): string {
   return value;
 }
 
+function boundedInteger(
+  name: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const value = Number(process.env[name] ?? fallback);
+  return Number.isInteger(value) && value >= minimum && value <= maximum
+    ? value
+    : fallback;
+}
+
 export const env = {
   authSecret: () => required("AUTH_SECRET"),
   githubWebhookUrl: () => required("GITHUB_WEBHOOK_URL"),
@@ -21,9 +33,17 @@ export const env = {
   openAiApiKey: () => required("OPENAI_API_KEY"),
   openAiBaseUrl: () => process.env.OPENAI_BASE_URL?.trim(),
   openAiModel: () => process.env.OPENAI_MODEL?.trim(),
+  // Conservative defaults fit Groq's 8K TPM free tier while remaining
+  // configurable for models and accounts with larger request budgets.
+  llmMaxUserPromptChars: () =>
+    boundedInteger('LLM_MAX_USER_PROMPT_CHARS', 14_000, 1_000, 1_000_000),
+  llmMaxCompletionTokens: () =>
+    boundedInteger('LLM_MAX_COMPLETION_TOKENS', 1_024, 128, 32_768),
   redisUrl: () => required("REDIS_URL"),
   workerConcurrency: () => {
-    const value = Number(process.env.WORKER_CONCURRENCY ?? "2");
-    return Number.isInteger(value) && value > 0 ? value : 2;
+    // A single worker is the safe default for low-TPM LLM provider tiers.
+    // Deployments with a larger provider budget can opt in to more parallelism.
+    const value = Number(process.env.WORKER_CONCURRENCY ?? "1");
+    return Number.isInteger(value) && value > 0 ? value : 1;
   },
 };

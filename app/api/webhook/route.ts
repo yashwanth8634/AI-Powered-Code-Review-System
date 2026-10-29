@@ -11,6 +11,7 @@ import { validateWebhookSignature } from '@/lib/github';
 import { connectDb, Scan, Repo } from '@/lib/db';
 import { addScanJob } from '@/lib/queue';
 import type { GitHubPushPayload } from '@/lib/types';
+import { env } from '@/lib/config/env';
 
 export async function POST(request: Request) {
   try {
@@ -73,61 +74,69 @@ export async function POST(request: Request) {
     await connectDb();
 
     // 5. Look up repo settings if connected
-    const repoDoc = await Repo.findOne({
+    const repoDocs = await Repo.find({
       ownerAndRepo: repository.full_name,
     }).lean();
 
-    if (!repoDoc) {
+    if (repoDocs.length === 0) {
       return NextResponse.json(
         { message: 'Repository is not connected to an account.' },
         { status: 202 }
       );
     }
 
-    const settings = repoDoc?.settings;
-
-    // 6. Create pending Scan record in MongoDB
-    const scanDoc = await Scan.create({
-      userId: String(repoDoc.userId),
-      repoUrl: repository.clone_url,
-      ownerAndRepo: repository.full_name,
-      triggeredBy: 'webhook',
-      startedAt: new Date().toISOString(),
-      status: 'pending',
-      architectureFindings: [],
-      securityFindings: [],
-      summary: {
-        architectureHigh: 0,
-        architectureMedium: 0,
-        architectureLow: 0,
-        securityCritical: 0,
-        securityHigh: 0,
-        securityMedium: 0,
-        securityLow: 0,
-        totalIssues: 0,
-      },
-    });
-
-    const scanId = String(scanDoc._id);
-
-    // 7. Enqueue background scan job
-    try {
-      await addScanJob({
+    const scanIds: string[] = [];
+    const queuedScanIds: string[] = [];
+    for (const repoDoc of repoDocs) {
+      const scanDoc = await Scan.create({
         userId: String(repoDoc.userId),
+        repoId: repoDoc._id,
         repoUrl: repository.clone_url,
+        ownerAndRepo: repository.full_name,
         triggeredBy: 'webhook',
-        settings,
-        scanId,
+        startedAt: new Date().toISOString(),
+        status: 'pending',
+        architectureFindings: [],
+        securityFindings: [],
+        summary: {
+          architectureHigh: 0,
+          architectureMedium: 0,
+          architectureLow: 0,
+          securityCritical: 0,
+          securityHigh: 0,
+          securityMedium: 0,
+          securityLow: 0,
+          totalIssues: 0,
+        },
       });
-    } catch (queueErr) {
-      console.error('[POST /api/webhook] Failed to enqueue scan job:', queueErr);
+      const scanId = String(scanDoc._id);
+      scanIds.push(scanId);
 
-      await Scan.findByIdAndUpdate(scanId, {
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        errorMessage: 'Failed to enqueue webhook scan job into Redis queue.',
-      });
+      try {
+        await addScanJob({
+          userId: String(repoDoc.userId),
+          repoUrl: repository.clone_url,
+          triggeredBy: 'webhook',
+          settings: repoDoc.settings,
+          scanId,
+          githubAccessToken: env.githubToken(),
+        });
+        queuedScanIds.push(scanId);
+      } catch (queueErr) {
+        console.error(
+          `[POST /api/webhook] Failed to enqueue scan ${scanId}:`,
+          queueErr
+        );
 
+        await Scan.findByIdAndUpdate(scanId, {
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+          errorMessage: 'Failed to enqueue webhook scan job into Redis queue.',
+        });
+      }
+    }
+
+    if (queuedScanIds.length === 0) {
       return NextResponse.json(
         { error: 'Queue service unavailable.' },
         { status: 503 }
@@ -138,7 +147,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message: 'Push webhook processed and scan queued.',
-        scanId,
+        scanIds,
+        queuedScanIds,
         repo: repository.full_name,
       },
       { status: 200 }

@@ -12,6 +12,7 @@ import { ingestRepo } from '@/lib/ingestion';
 import { runArchitectureAnalysis } from '@/lib/analysis';
 import { runSecurityAnalysis } from '@/lib/security';
 import { connectDb, Scan } from '@/lib/db';
+import { AppError } from '@/lib/errors';
 import type {
   ScanResult,
   ScanSummary,
@@ -70,6 +71,7 @@ function toScanResult(doc: { _id: unknown } & Partial<ScanResult>): ScanResult {
     startedAt: doc.startedAt ?? new Date().toISOString(),
     completedAt: doc.completedAt ?? new Date().toISOString(),
     status: doc.status ?? 'failed',
+    errorCode: doc.errorCode,
     errorMessage: doc.errorMessage,
     architectureFindings: doc.architectureFindings ?? [],
     securityFindings: doc.securityFindings ?? [],
@@ -86,6 +88,36 @@ function toScanResult(doc: { _id: unknown } & Partial<ScanResult>): ScanResult {
   };
 }
 
+interface ScanFailure {
+  code: string;
+  userMessage: string;
+  diagnostic: string;
+}
+
+/**
+ * App errors already contain an intentional, user-safe message. Unknown
+ * exceptions are only logged; their implementation details never reach MongoDB
+ * or the browser.
+ */
+function toScanFailure(error: unknown): ScanFailure {
+  if (error instanceof AppError) {
+    return {
+      code: error.code,
+      userMessage: error.message,
+      diagnostic: error.message,
+    };
+  }
+
+  const diagnostic =
+    error instanceof Error ? error.stack ?? error.message : String(error);
+
+  return {
+    code: 'UNEXPECTED_SCAN_FAILURE',
+    userMessage: 'The scan stopped unexpectedly. Please try again shortly.',
+    diagnostic,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -96,6 +128,7 @@ export interface RunFullScanOptions {
   triggeredBy: 'on-demand' | 'webhook';
   settings?: ScanSettings;
   scanId?: string;
+  githubAccessToken?: string;
 }
 
 /**
@@ -110,7 +143,7 @@ export interface RunFullScanOptions {
  * @returns The final ScanResult (complete or failed).
  */
 export async function runFullScan(options: RunFullScanOptions): Promise<ScanResult> {
-  const { userId, repoUrl, triggeredBy, settings } = options;
+  const { userId, repoUrl, triggeredBy, settings, githubAccessToken } = options;
   const startedAt = new Date().toISOString();
 
   await connectDb();
@@ -139,7 +172,7 @@ export async function runFullScan(options: RunFullScanOptions): Promise<ScanResu
 
   try {
     // Step 3: Ingestion.
-    const ingestResult = await ingestRepo(repoUrl);
+    const ingestResult = await ingestRepo(repoUrl, githubAccessToken);
     cleanup = ingestResult.cleanup;
     const { context } = ingestResult;
 
@@ -166,16 +199,27 @@ export async function runFullScan(options: RunFullScanOptions): Promise<ScanResu
         securityFindings,
         summary,
       },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     return toScanResult({ _id: scanId, ...updated } as Parameters<typeof toScanResult>[0]);
   } catch (err) {
     // Step 6: Persist failure.
+    const failure = toScanFailure(err);
+    console.error('[runFullScan] Scan failed', {
+      event: 'scan_failed',
+      scanId,
+      repoUrl,
+      triggeredBy,
+      code: failure.code,
+      diagnostic: failure.diagnostic,
+    });
+
     await Scan.findByIdAndUpdate(scanId, {
       status: 'failed',
       completedAt: new Date().toISOString(),
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorCode: failure.code,
+      errorMessage: failure.userMessage,
     });
 
     const failed = await Scan.findById(scanId).lean();

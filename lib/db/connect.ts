@@ -8,10 +8,13 @@
 
 import mongoose from 'mongoose';
 import { env } from '@/lib/config/env';
+import { Repo } from '@/lib/db/models/Repo';
+import { Scan } from '@/lib/db/models/Scan';
 
 // Extend the Node.js global to hold our cached promise.
 declare global {
   var _mongooseConnPromise: Promise<typeof mongoose> | undefined;
+  var _repoIndexPromise: Promise<void> | undefined;
 }
 
 /**
@@ -21,16 +24,44 @@ declare global {
 export async function connectDb(): Promise<void> {
   const uri = env.mongodbUri();
 
-  if (mongoose.connection.readyState === 1) {
-    // Already connected — nothing to do.
-    return;
+  if (mongoose.connection.readyState !== 1) {
+    if (!global._mongooseConnPromise) {
+      global._mongooseConnPromise = mongoose.connect(uri, {
+        bufferCommands: false,
+      });
+    }
+
+    await global._mongooseConnPromise;
   }
 
-  if (!global._mongooseConnPromise) {
-    global._mongooseConnPromise = mongoose.connect(uri, {
-      bufferCommands: false,
+  if (!global._repoIndexPromise) {
+    global._repoIndexPromise = (async () => {
+      const indexes = await Repo.collection.listIndexes().toArray();
+      if (indexes.some((index) => index.name === 'ownerAndRepo_1')) {
+        await Repo.collection.dropIndex('ownerAndRepo_1');
+      }
+      await Repo.syncIndexes();
+
+      const repositories = await Repo.find()
+        .select('_id userId ownerAndRepo')
+        .lean();
+      await Promise.all(
+        repositories.map((repository) =>
+          Scan.updateMany(
+            {
+              userId: repository.userId,
+              ownerAndRepo: repository.ownerAndRepo,
+              repoId: { $exists: false },
+            },
+            { $set: { repoId: repository._id } }
+          )
+        )
+      );
+    })().catch((error) => {
+      global._repoIndexPromise = undefined;
+      throw error;
     });
   }
 
-  await global._mongooseConnPromise;
+  await global._repoIndexPromise;
 }

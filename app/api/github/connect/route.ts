@@ -11,6 +11,22 @@ interface ConnectRepoRequest {
   repo: string;
 }
 
+interface GitHubWebhook {
+  id: number;
+  config?: {
+    url?: string;
+  };
+}
+
+function normalizeWebhookUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+const githubHeaders = (accessToken: string): HeadersInit => ({
+  Authorization: `Bearer ${accessToken}`,
+  Accept: "application/vnd.github+json",
+});
+
 export async function POST(req: Request) {
   const session = await auth();
 
@@ -96,34 +112,88 @@ export async function POST(req: Request) {
 
     const githubRepo = await repoResponse.json();
 
-    const webhookResponse = await fetch(
-      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/hooks`,
+    const hooksUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/hooks`;
+    const hooksResponse = await fetch(hooksUrl, {
+      headers: githubHeaders(githubAccessToken),
+      cache: "no-store",
+    });
+
+    if (!hooksResponse.ok) {
+      const errorText = await hooksResponse.text();
+
+      console.error(
+        "GitHub webhook lookup failed:",
+        hooksResponse.status,
+        errorText
+      );
+
+      return NextResponse.json(
+        {
+          error: `Unable to check existing GitHub webhooks (${hooksResponse.status}): ${errorText}`,
+        },
+        { status: hooksResponse.status }
+      );
+    }
+
+    const hooks = (await hooksResponse.json()) as GitHubWebhook[];
+    const webhookPayload = {
+      name: "web",
+      active: true,
+      events: ["push"],
+      config: {
+        url: webhookUrl,
+        content_type: "json",
+        secret: webhookSecret,
+        insecure_ssl: "0",
+      },
+    };
+    const findMatchingWebhook = (availableHooks: GitHubWebhook[]) =>
+      availableHooks.find(
+        (hook) =>
+          hook.config?.url &&
+          normalizeWebhookUrl(hook.config.url) === normalizeWebhookUrl(webhookUrl)
+      );
+    const existingWebhook = findMatchingWebhook(hooks);
+    let webhookResponse = await fetch(
+      existingWebhook ? `${hooksUrl}/${existingWebhook.id}` : hooksUrl,
       {
-        method: "POST",
+        method: existingWebhook ? "PATCH" : "POST",
         headers: {
-          Authorization: `Bearer ${githubAccessToken}`,
-          Accept: "application/vnd.github+json",
+          ...githubHeaders(githubAccessToken),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: "web",
-          active: true,
-          events: ["push"],
-          config: {
-            url: webhookUrl,
-            content_type: "json",
-            secret: webhookSecret,
-            insecure_ssl: "0",
-          },
-        }),
+        body: JSON.stringify(webhookPayload),
       }
     );
+
+    // Another request may have created the hook between our GET and POST.
+    if (!webhookResponse.ok && !existingWebhook && webhookResponse.status === 422) {
+      const retryHooksResponse = await fetch(hooksUrl, {
+        headers: githubHeaders(githubAccessToken),
+        cache: "no-store",
+      });
+      const retryHooks = retryHooksResponse.ok
+        ? ((await retryHooksResponse.json()) as GitHubWebhook[])
+        : [];
+      const concurrentWebhook = findMatchingWebhook(retryHooks);
+
+      if (concurrentWebhook) {
+        webhookResponse = await fetch(`${hooksUrl}/${concurrentWebhook.id}`, {
+          method: "PATCH",
+          headers: {
+            ...githubHeaders(githubAccessToken),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(webhookPayload),
+        });
+      }
+    }
 
     if (!webhookResponse.ok) {
       const errorText = await webhookResponse.text();
 
       console.error(
-        "GitHub webhook creation failed:",
+        "GitHub webhook synchronization failed:",
         webhookResponse.status,
         errorText
       );
@@ -151,7 +221,7 @@ export async function POST(req: Request) {
       },
       {
         upsert: true,
-        new: true,
+        returnDocument: "after",
         setDefaultsOnInsert: true,
       }
     );
@@ -248,7 +318,7 @@ export async function PUT(req: Request) {
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
     ).lean();

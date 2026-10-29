@@ -28,9 +28,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           githubId,
           name: user.name,
           email: user.email,
-          image: user.image,
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
+        {
+          upsert: true,
+          returnDocument: "after",
+          setDefaultsOnInsert: true,
+        },
       );
 
       return true;

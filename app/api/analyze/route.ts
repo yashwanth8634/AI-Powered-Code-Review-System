@@ -12,6 +12,7 @@ import { addScanJob } from '@/lib/queue';
 import { parseGitHubUrl } from '@/lib/validation/github-url';
 import { readJson } from '@/lib/http/response';
 import { getAuthenticatedUserId } from '@/lib/auth/getUserId';
+import { getGitHubAccessToken } from '@/lib/auth/getGitHubAccessToken';
 import { Repo } from '@/lib/db/models/Repo';
 
 const AnalyzeBodySchema = z.object({
@@ -30,6 +31,14 @@ export async function POST(request: Request) {
     const userId = await getAuthenticatedUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const githubAccessToken = await getGitHubAccessToken(request);
+    if (!githubAccessToken) {
+      return NextResponse.json(
+        { error: 'GitHub access token not found. Please sign in again.' },
+        { status: 401 },
+      );
     }
 
     const rawBody = await readJson(request);
@@ -86,6 +95,7 @@ export async function POST(request: Request) {
     // Create a pending Scan record in MongoDB immediately so clients can poll.
     const scanDoc = await Scan.create({
       userId,
+      repoId: connectedRepo._id,
       repoUrl: parsedRepo.normalizedUrl,
       ownerAndRepo: parsedRepo.fullName,
       triggeredBy: 'on-demand',
@@ -115,6 +125,7 @@ export async function POST(request: Request) {
         triggeredBy: 'on-demand',
         settings: settings ?? connectedRepo.settings,
         scanId,
+        githubAccessToken,
       });
     } catch (queueErr) {
       console.error('[POST /api/analyze] Failed to enqueue job:', queueErr);

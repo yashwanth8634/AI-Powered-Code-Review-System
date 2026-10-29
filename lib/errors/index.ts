@@ -9,7 +9,7 @@
 // Base
 // ---------------------------------------------------------------------------
 
-abstract class AppError extends Error {
+export abstract class AppError extends Error {
   abstract readonly code: string;
 
   constructor(message: string) {
@@ -26,6 +26,13 @@ abstract class AppError extends Error {
 
 export type IngestionErrorCode =
   | 'CLONE_FAILED'
+  | 'CLONE_AUTH_REQUIRED'
+  | 'CLONE_AUTH_FAILED'
+  | 'CLONE_ACCESS_DENIED'
+  | 'CLONE_REPOSITORY_UNAVAILABLE'
+  | 'CLONE_NETWORK_FAILED'
+  | 'CLONE_GIT_UNAVAILABLE'
+  | 'CLONE_WORKSPACE_FAILED'
   | 'TREE_BUILD_FAILED'
   | 'FILE_READ_FAILED';
 
@@ -44,6 +51,7 @@ export class IngestionError extends AppError {
 
 export type LLMErrorCode =
   | 'LLM_TIMEOUT'
+  | 'LLM_CONTEXT_TOO_LARGE'
   | 'LLM_API_ERROR'
   | 'LLM_PARSE_FAILED';
 

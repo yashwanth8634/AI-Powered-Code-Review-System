@@ -48,10 +48,20 @@ const RepoSchema = new Schema<RepoDocument>(
     webhookId: { type: Number },
     settings: { type: ScanSettingsSchema, default: () => ({}) },
   },
-  { timestamps: false }
+  {
+    timestamps: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
 RepoSchema.index({ userId: 1, ownerAndRepo: 1 }, { unique: true });
+
+RepoSchema.virtual('scans', {
+  ref: 'Scan',
+  localField: '_id',
+  foreignField: 'repoId',
+});
 
 export const Repo =
   (models.Repo as mongoose.Model<RepoDocument>) ??

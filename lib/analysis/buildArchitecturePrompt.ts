@@ -36,13 +36,57 @@ Rules:
 - Do not invent findings. Only report what you can support with evidence from the provided code.
 - "affectedFiles" may be an empty array if you cannot pinpoint a specific file.`;
 
+/**
+ * Code tokenization can be denser than normal prose. These conservative source
+ * limits keep the resulting architecture request below the default 8K TPM
+ * provider budget once system instructions and model output are included.
+ */
+export const MAX_ARCHITECTURE_FILE_TREE_CHARS = 2_500;
+export const MAX_ARCHITECTURE_KEY_FILES_CHARS = 9_000;
+
+function truncateForPrompt(
+  value: string,
+  maximumChars: number,
+  suffix: string,
+): string {
+  if (value.length <= maximumChars) {
+    return value;
+  }
+
+  if (maximumChars <= suffix.length) {
+    return value.slice(0, maximumChars);
+  }
+
+  return `${value.slice(0, maximumChars - suffix.length)}${suffix}`;
+}
+
 function formatKeyFiles(keyFiles: KeyFile[]): string {
-  return keyFiles
-    .map(
-      (kf) =>
-        `=== FILE: ${kf.relativePath} ===\n${kf.content}\n=== END: ${kf.relativePath} ===`
-    )
-    .join('\n\n');
+  let output = '';
+
+  for (const keyFile of keyFiles) {
+    const separator = output ? '\n\n' : '';
+    const header = `=== FILE: ${keyFile.relativePath} ===\n`;
+    const footer = `\n=== END: ${keyFile.relativePath} ===`;
+    const contentBudget =
+      MAX_ARCHITECTURE_KEY_FILES_CHARS -
+      output.length -
+      separator.length -
+      header.length -
+      footer.length;
+
+    if (contentBudget <= 0) {
+      break;
+    }
+
+    const content = truncateForPrompt(
+      keyFile.content,
+      contentBudget,
+      '\n// [truncated to fit the architecture-analysis context budget]',
+    );
+    output += `${separator}${header}${content}${footer}`;
+  }
+
+  return output;
 }
 
 export interface ArchitecturePrompt {
@@ -72,7 +116,11 @@ export function buildArchitecturePrompt(
     `Repository: ${context.ownerAndRepo}`,
     '',
     '--- FILE TREE ---',
-    context.fileTree,
+    truncateForPrompt(
+      context.fileTree,
+      MAX_ARCHITECTURE_FILE_TREE_CHARS,
+      '\n... [file tree truncated to fit the architecture-analysis context budget]',
+    ),
     '',
     '--- KEY SOURCE FILES ---',
     formatKeyFiles(context.keyFileContents),

@@ -116,6 +116,8 @@ export interface ScanResult {
   startedAt: string; // ISO 8601
   completedAt: string; // ISO 8601
   status: 'pending' | 'running' | 'complete' | 'failed';
+  /** Stable internal reference for a failed scan; safe to show in the UI. */
+  errorCode?: string;
   errorMessage?: string;
   architectureFindings: ArchitectureFinding[];
   securityFindings: SecurityFinding[];

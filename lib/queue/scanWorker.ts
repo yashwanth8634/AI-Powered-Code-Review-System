@@ -21,29 +21,44 @@ const REDIS_URL = env.redisUrl();
 
 /**
  * How many jobs to process in parallel.
- * Keep low (2) — each job makes 2 LLM API calls which are rate-limited.
+ * Default to 1 — each job can make two LLM API calls, and low-tier providers
+ * often enforce a small tokens-per-minute budget. Set WORKER_CONCURRENCY only
+ * after confirming the configured provider can sustain more parallel scans.
  */
 const WORKER_CONCURRENCY = env.workerConcurrency();
 
 const connection = new IORedis(REDIS_URL, {
   maxRetriesPerRequest: null,
-  enableOfflineQueue: false,
+  enableOfflineQueue: true,
 });
 
 const worker = new Worker<ScanJobPayload>(
   QUEUE_NAME,
   async (job) => {
-    const { userId, repoUrl, triggeredBy, settings, scanId } = job.data;
+    const { userId, repoUrl, triggeredBy, settings, scanId, githubAccessToken } =
+      job.data;
 
     console.log(
       `[worker] Starting job ${job.id}: ${repoUrl} (triggered by: ${triggeredBy})`
     );
 
-    const result = await runFullScan({ userId, repoUrl, triggeredBy, settings, scanId });
+    const result = await runFullScan({
+      userId,
+      repoUrl,
+      triggeredBy,
+      settings,
+      scanId,
+      githubAccessToken,
+    });
 
     console.log(
       `[worker] Finished job ${job.id}: status=${result.status} scanId=${result.id}`
     );
+    if (result.status === 'failed') {
+      console.error(
+        `[worker] Scan ${result.id} failed: ${result.errorMessage ?? 'Unknown error'}`
+      );
+    }
 
     return result.id;
   },

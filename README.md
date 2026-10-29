@@ -67,6 +67,17 @@ npm run dev
 
 Open http://localhost:3000 in your browser.
 
+Start the scan worker in a second terminal. The API only queues scans; the
+worker performs cloning, architecture analysis, and security analysis:
+
+```bash
+npm run worker
+```
+
+The worker requires the same MongoDB, Redis, and AI environment variables as
+the Next.js process. Semgrep must also be installed in the worker environment
+for security findings to be collected.
+
 ## Development Status
 
 Account authentication, per-account repository connections, repository-scoped scan history, and analysis settings have been implemented. Scan execution, Redis queue availability, webhook processing, and end-to-end behavior require verification.

@@ -49,6 +49,7 @@ export async function GET(
       startedAt: doc.startedAt,
       completedAt: doc.completedAt ?? '',
       status: doc.status,
+      errorCode: doc.errorCode,
       errorMessage: doc.errorMessage,
       architectureFindings: doc.architectureFindings ?? [],
       securityFindings: doc.securityFindings ?? [],
